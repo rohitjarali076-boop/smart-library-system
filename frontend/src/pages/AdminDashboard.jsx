@@ -13,12 +13,12 @@ const AdminDashboard = () => {
   const [books, setBooks] = useState([]);
   const [users, setUsers] = useState([]);
   const [borrows, setBorrows] = useState([]);
-  const [activeTab, setActiveTab] = useState('borrows'); // 'borrows' | 'issue' | 'books' | 'users' | 'addBook'
+  const [activeTab, setActiveTab] = useState('issue'); // 'borrows' | 'issue' | 'books' | 'users' | 'addBook'
   const [loading, setLoading] = useState(true);
 
-  // Form states: Manual name input + Dropdown book selection
-  const [issueForm, setIssueForm] = useState({ studentName: '', bookId: '', days: 14 });
-  const [newBook, setNewBook] = useState({ title: '', author: '', isbn: '', category: 'Computer Science', copies: 1 });
+  // Form states: Text input for Student Name & Full fields for Add Book
+  const [issueForm, setIssueForm] = useState({ studentName: '', bookId: '', days: 10 });
+  const [newBook, setNewBook] = useState({ title: '', author: '', isbn: '', category: 'Computer Science', copies: 5 });
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,7 +71,7 @@ const AdminDashboard = () => {
       });
 
       setMessage(`✅ ${res.data.message || 'Book issued successfully!'}`);
-      setIssueForm({ studentName: '', bookId: '', days: 14 });
+      setIssueForm({ studentName: '', bookId: '', days: 10 });
       fetchAdminData();
     } catch (err) {
       setMessage(`❌ Failed to issue book: ${err.response?.data?.message || 'Error occurred'}`);
@@ -86,12 +86,21 @@ const AdminDashboard = () => {
     setSubmitting(true);
     const token = localStorage.getItem('token');
 
+    const bookPayload = {
+      title: newBook.title,
+      author: newBook.author,
+      isbn: newBook.isbn || `ISBN-${Date.now()}`,
+      category: newBook.category,
+      copies: Number(newBook.copies) || 1,
+      availableCopies: Number(newBook.copies) || 1
+    };
+
     try {
-      await axios.post(`${API_BASE_URL}/api/v1/books`, newBook, {
+      await axios.post(`${API_BASE_URL}/api/v1/books`, bookPayload, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMessage('✅ Book saved permanently to catalog!');
-      setNewBook({ title: '', author: '', isbn: '', category: 'Computer Science', copies: 1 });
+      setNewBook({ title: '', author: '', isbn: '', category: 'Computer Science', copies: 5 });
       fetchAdminData();
     } catch (err) {
       setMessage(`❌ Failed: ${err.response?.data?.message || 'Error occurred'}`);
@@ -246,12 +255,12 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* TAB 2: ISSUE BOOK FORM (TYPE NAME + SELECT SAVED BOOK) */}
+      {/* TAB 2: ISSUE BOOK FORM (TEXT INPUT FOR STUDENT NAME) */}
       {activeTab === 'issue' && (
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-xl space-y-4">
           <div>
             <h2 className="text-xl font-bold text-white">Issue Book to Student</h2>
-            <p className="text-xs text-slate-400">Type student name and select an existing book from the catalog</p>
+            <p className="text-xs text-slate-400">Type student name manually and select a book from the catalog</p>
           </div>
 
           {message && <div className="p-3 bg-slate-800 text-xs font-semibold rounded-xl">{message}</div>}
@@ -262,7 +271,7 @@ const AdminDashboard = () => {
               <input
                 type="text"
                 required
-                placeholder="Type student full name..."
+                placeholder="Type student name manually..."
                 value={issueForm.studentName}
                 onChange={(e) => setIssueForm({ ...issueForm, studentName: e.target.value })}
                 className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
@@ -278,11 +287,14 @@ const AdminDashboard = () => {
                 className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
               >
                 <option value="">-- Choose Book ({books.length} saved in library) --</option>
-                {books.map((b) => (
-                  <option key={b._id} value={b._id} disabled={(b.availableCopies ?? b.copies) <= 0}>
-                    {b.title} — By {b.author} ({(b.availableCopies ?? b.copies ?? 1)} copies left)
-                  </option>
-                ))}
+                {books.map((b) => {
+                  const available = b.availableCopies !== undefined ? b.availableCopies : (b.copies !== undefined ? b.copies : 1);
+                  return (
+                    <option key={b._id} value={b._id} disabled={available <= 0}>
+                      {b.title} ({available} available)
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -320,7 +332,8 @@ const AdminDashboard = () => {
                   <th className="p-3">Title</th>
                   <th className="p-3">Author</th>
                   <th className="p-3">Category</th>
-                  <th className="p-3">Available Copies</th>
+                  <th className="p-3">Total Copies</th>
+                  <th className="p-3">Available</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
@@ -328,7 +341,8 @@ const AdminDashboard = () => {
                   <tr key={b._id} className="hover:bg-slate-800/40">
                     <td className="p-3 font-semibold text-white">{b.title}</td>
                     <td className="p-3">{b.author}</td>
-                    <td className="p-3"><span className="text-[10px] bg-slate-800 text-sky-400 p-1 rounded">{b.category}</span></td>
+                    <td className="p-3"><span className="text-[10px] bg-slate-800 text-sky-400 p-1 rounded">{b.category || 'General'}</span></td>
+                    <td className="p-3 font-bold text-white">{b.copies ?? 1}</td>
                     <td className="p-3 font-bold text-emerald-400">{b.availableCopies ?? b.copies ?? 1}</td>
                   </tr>
                 ))}
@@ -365,34 +379,59 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* TAB 5: ADD NEW BOOK */}
+      {/* TAB 5: ADD NEW BOOK FORM WITH COPIES INPUT */}
       {activeTab === 'addBook' && (
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-xl space-y-4">
           <h2 className="text-xl font-bold text-white">Add New Book to Catalog</h2>
           {message && <div className="p-3 bg-slate-800 text-xs font-semibold rounded-xl">{message}</div>}
           <form onSubmit={handleAddBook} className="space-y-4">
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Book Title</label>
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Book Title *</label>
               <input
                 type="text"
                 required
+                placeholder="e.g. Clean Code"
                 value={newBook.title}
                 onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white"
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Author</label>
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Author *</label>
               <input
                 type="text"
                 required
+                placeholder="e.g. Robert C. Martin"
                 value={newBook.author}
                 onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white"
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
               />
             </div>
-            <button type="submit" disabled={submitting} className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-xl text-sm">
-              {submitting ? 'Saving...' : 'Add Book'}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-slate-400 font-semibold block mb-1">Category</label>
+                <input
+                  type="text"
+                  required
+                  value={newBook.category}
+                  onChange={(e) => setNewBook({ ...newBook, category: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 font-semibold block mb-1">Number of Copies *</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={newBook.copies}
+                  onChange={(e) => setNewBook({ ...newBook, copies: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+                />
+              </div>
+            </div>
+            <button type="submit" disabled={submitting} className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-xl text-sm transition">
+              {submitting ? 'Saving...' : 'Add Book to System'}
             </button>
           </form>
         </div>
