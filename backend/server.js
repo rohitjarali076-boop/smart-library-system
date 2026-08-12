@@ -43,10 +43,14 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Library System API Online' });
 });
 
+// Remove any duplicate "const PORT" lines above this
+
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`\n==================================================`);
-  console.log(`🚀 Server listening on port ${PORT}`);
-  console.log(`==================================================\n`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
