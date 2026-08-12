@@ -12,17 +12,13 @@ const AdminDashboard = () => {
   });
   const [books, setBooks] = useState([]);
   const [users, setUsers] = useState([]);
-  const [activeTab, setActiveTab] = useState('books'); // 'books' | 'users' | 'addBook'
+  const [borrows, setBorrows] = useState([]);
+  const [activeTab, setActiveTab] = useState('borrows'); // 'borrows' | 'issue' | 'books' | 'users' | 'addBook'
   const [loading, setLoading] = useState(true);
 
-  // Form state for adding a new book
-  const [newBook, setNewBook] = useState({
-    title: '',
-    author: '',
-    isbn: '',
-    category: 'Computer Science',
-    copies: 1,
-  });
+  // Form states
+  const [issueForm, setIssueForm] = useState({ userId: '', bookId: '', days: 14 });
+  const [newBook, setNewBook] = useState({ title: '', author: '', isbn: '', category: 'Computer Science', copies: 1 });
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -48,17 +44,39 @@ const AdminDashboard = () => {
 
       setBooks(bookList);
       setUsers(userList);
+      setBorrows(borrowList);
 
       setStats({
         totalBooks: bookList.length,
         totalMembers: userList.length,
-        activeBorrows: borrowList.filter((b) => b.status === 'BORROWED' || !b.returnedAt).length,
+        activeBorrows: borrowList.filter((b) => b.status === 'BORROWED' || !b.returnDate).length,
         overdueBorrows: borrowList.filter((b) => b.status === 'OVERDUE').length,
       });
     } catch (err) {
-      console.error('Error loading admin dashboard data:', err);
+      console.error('Error loading admin data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleIssueBook = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    setSubmitting(true);
+    const token = localStorage.getItem('token');
+
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/v1/borrow/issue`, issueForm, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setMessage(`✅ ${res.data.message || 'Book issued successfully!'}`);
+      setIssueForm({ userId: '', bookId: '', days: 14 });
+      fetchAdminData();
+    } catch (err) {
+      setMessage(`❌ Failed to issue book: ${err.response?.data?.message || 'Error occurred'}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -69,49 +87,16 @@ const AdminDashboard = () => {
     const token = localStorage.getItem('token');
 
     try {
-      const res = await axios.post(
-        `${API_BASE_URL}/api/v1/books`,
-        {
-          title: newBook.title,
-          author: newBook.author,
-          isbn: newBook.isbn || `ISBN-${Date.now()}`,
-          category: newBook.category,
-          copies: Number(newBook.copies) || 1,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (res.status === 200 || res.status === 201) {
-        setMessage('✅ Book saved permanently to MongoDB database!');
-        setNewBook({
-          title: '',
-          author: '',
-          isbn: '',
-          category: 'Computer Science',
-          copies: 1,
-        });
-        fetchAdminData();
-      }
-    } catch (err) {
-      setMessage(`❌ Failed to save book: ${err.response?.data?.message || 'Server error occurred'}`);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteBook = async (id) => {
-    if (!window.confirm('Are you sure you want to permanently delete this book from the catalog?')) return;
-    const token = localStorage.getItem('token');
-
-    try {
-      await axios.delete(`${API_BASE_URL}/api/v1/books/${id}`, {
+      await axios.post(`${API_BASE_URL}/api/v1/books`, newBook, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      setMessage('✅ Book saved permanently to catalog!');
+      setNewBook({ title: '', author: '', isbn: '', category: 'Computer Science', copies: 1 });
       fetchAdminData();
     } catch (err) {
-      alert(`Failed to delete book: ${err.response?.data?.message || 'Error occurred'}`);
+      setMessage(`❌ Failed: ${err.response?.data?.message || 'Error occurred'}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -124,42 +109,30 @@ const AdminDashboard = () => {
             <span className="bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold px-2.5 py-1 rounded-md uppercase">
               Admin Portal
             </span>
-            <h1 className="text-3xl font-extrabold text-white">System Administration</h1>
+            <h1 className="text-3xl font-extrabold text-white">Library Issuing & Management</h1>
           </div>
-          <p className="text-sm text-slate-400 mt-1">
-            Manage library catalog, member accounts, and issuing operations
-          </p>
+          <p className="text-sm text-slate-400 mt-1">Record which student borrowed which book and manage catalog</p>
         </div>
-        <button
-          onClick={() => {
-            setMessage('');
-            setActiveTab('addBook');
-          }}
-          className="bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition shadow-lg shadow-sky-600/20 flex items-center space-x-2"
-        >
-          <span>➕</span>
-          <span>Add New Book</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setMessage(''); setActiveTab('issue'); }}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition flex items-center space-x-1"
+          >
+            <span>📖</span>
+            <span>Issue Book</span>
+          </button>
+          <button
+            onClick={() => { setMessage(''); setActiveTab('addBook'); }}
+            className="bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition flex items-center space-x-1"
+          >
+            <span>➕</span>
+            <span>Add Book</span>
+          </button>
+        </div>
       </div>
 
-      {/* Quick Metrics */}
+      {/* Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Catalog Titles</p>
-            <p className="text-3xl font-black text-white mt-2">{stats.totalBooks}</p>
-          </div>
-          <div className="p-3 bg-slate-800 rounded-xl text-xl">📚</div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Registered Members</p>
-            <p className="text-3xl font-black text-emerald-400 mt-2">{stats.totalMembers}</p>
-          </div>
-          <div className="p-3 bg-slate-800 rounded-xl text-xl">👥</div>
-        </div>
-
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Book Loans</p>
@@ -167,7 +140,20 @@ const AdminDashboard = () => {
           </div>
           <div className="p-3 bg-slate-800 rounded-xl text-xl">🔄</div>
         </div>
-
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Catalog Titles</p>
+            <p className="text-3xl font-black text-white mt-2">{stats.totalBooks}</p>
+          </div>
+          <div className="p-3 bg-slate-800 rounded-xl text-xl">📚</div>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Registered Members</p>
+            <p className="text-3xl font-black text-emerald-400 mt-2">{stats.totalMembers}</p>
+          </div>
+          <div className="p-3 bg-slate-800 rounded-xl text-xl">👥</div>
+        </div>
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Overdue Alerts</p>
@@ -177,128 +163,80 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 space-x-4">
+      {/* Tabs */}
+      <div className="flex border-b border-slate-800 space-x-4 overflow-x-auto">
         <button
-          onClick={() => setActiveTab('books')}
-          className={`pb-3 px-2 font-semibold text-sm transition border-b-2 ${
-            activeTab === 'books'
-              ? 'border-sky-500 text-sky-400'
-              : 'border-transparent text-slate-400 hover:text-white'
+          onClick={() => setActiveTab('borrows')}
+          className={`pb-3 px-2 font-semibold text-sm transition border-b-2 whitespace-nowrap ${
+            activeTab === 'borrows' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-white'
           }`}
         >
-          📖 Manage Catalog ({books.length})
+          📋 Active Loans ({borrows.length})
+        </button>
+        <button
+          onClick={() => { setMessage(''); setActiveTab('issue'); }}
+          className={`pb-3 px-2 font-semibold text-sm transition border-b-2 whitespace-nowrap ${
+            activeTab === 'issue' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          ✍️ Issue Book to Student
+        </button>
+        <button
+          onClick={() => setActiveTab('books')}
+          className={`pb-3 px-2 font-semibold text-sm transition border-b-2 whitespace-nowrap ${
+            activeTab === 'books' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          📖 Catalog ({books.length})
         </button>
         <button
           onClick={() => setActiveTab('users')}
-          className={`pb-3 px-2 font-semibold text-sm transition border-b-2 ${
-            activeTab === 'users'
-              ? 'border-sky-500 text-sky-400'
-              : 'border-transparent text-slate-400 hover:text-white'
+          className={`pb-3 px-2 font-semibold text-sm transition border-b-2 whitespace-nowrap ${
+            activeTab === 'users' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-white'
           }`}
         >
-          👥 Registered Users ({users.length})
+          👥 Users ({users.length})
         </button>
         <button
-          onClick={() => {
-            setMessage('');
-            setActiveTab('addBook');
-          }}
-          className={`pb-3 px-2 font-semibold text-sm transition border-b-2 ${
-            activeTab === 'addBook'
-              ? 'border-sky-500 text-sky-400'
-              : 'border-transparent text-slate-400 hover:text-white'
+          onClick={() => { setMessage(''); setActiveTab('addBook'); }}
+          className={`pb-3 px-2 font-semibold text-sm transition border-b-2 whitespace-nowrap ${
+            activeTab === 'addBook' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-white'
           }`}
         >
-          ➕ Add Catalog Item
+          ➕ Add New Book
         </button>
       </div>
 
-      {/* TAB 1: MANAGE CATALOG */}
-      {activeTab === 'books' && (
+      {/* TAB 1: ACTIVE BORROW RECORDS */}
+      {activeTab === 'borrows' && (
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-          <h2 className="text-xl font-bold text-white">Library Catalog Management</h2>
-          {loading ? (
-            <p className="text-slate-400 text-sm">Loading book catalog from database...</p>
-          ) : books.length === 0 ? (
-            <p className="text-slate-400 text-sm">No books registered in system database.</p>
+          <h2 className="text-xl font-bold text-white">Student Borrowing Records</h2>
+          {borrows.length === 0 ? (
+            <p className="text-slate-400 text-sm">No books currently issued.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-300">
                 <thead className="bg-slate-800 text-xs uppercase text-slate-400">
                   <tr>
-                    <th className="p-3">Title</th>
-                    <th className="p-3">Author</th>
-                    <th className="p-3">Category</th>
-                    <th className="p-3">Copies Available</th>
-                    <th className="p-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {books.map((book) => (
-                    <tr key={book._id} className="hover:bg-slate-800/40 transition">
-                      <td className="p-3 font-semibold text-white">{book.title}</td>
-                      <td className="p-3">{book.author}</td>
-                      <td className="p-3">
-                        <span className="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-sky-400 font-semibold">
-                          {book.category || 'General'}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <span className="font-bold text-emerald-400">
-                          {book.availableCopies ?? book.copies ?? 1}
-                        </span>{' '}
-                        / {book.copies || 1}
-                      </td>
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={() => handleDeleteBook(book._id)}
-                          className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 2: REGISTERED USERS */}
-      {activeTab === 'users' && (
-        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-          <h2 className="text-xl font-bold text-white">Registered System Users</h2>
-          {users.length === 0 ? (
-            <p className="text-slate-400 text-sm">No user records fetched from database.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-800 text-xs uppercase text-slate-400">
-                  <tr>
-                    <th className="p-3">Name</th>
+                    <th className="p-3">Student Name</th>
                     <th className="p-3">Email</th>
-                    <th className="p-3">Department</th>
-                    <th className="p-3">Role</th>
+                    <th className="p-3">Book Title</th>
+                    <th className="p-3">Issued Date</th>
+                    <th className="p-3">Due Date</th>
+                    <th className="p-3">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {users.map((u) => (
-                    <tr key={u._id} className="hover:bg-slate-800/40 transition">
-                      <td className="p-3 font-semibold text-white">{u.name}</td>
-                      <td className="p-3">{u.email}</td>
-                      <td className="p-3">{u.department || 'N/A'}</td>
+                  {borrows.map((b) => (
+                    <tr key={b._id} className="hover:bg-slate-800/40 transition">
+                      <td className="p-3 font-semibold text-white">{b.user?.name || 'N/A'}</td>
+                      <td className="p-3 text-slate-400">{b.user?.email || 'N/A'}</td>
+                      <td className="p-3 text-sky-300 font-semibold">{b.book?.title || 'N/A'}</td>
+                      <td className="p-3">{new Date(b.borrowDate || b.createdAt).toLocaleDateString()}</td>
+                      <td className="p-3 text-amber-400">{new Date(b.dueDate).toLocaleDateString()}</td>
                       <td className="p-3">
-                        <span
-                          className={`text-[10px] px-2.5 py-1 rounded font-bold uppercase border ${
-                            u.role?.toUpperCase() === 'ADMIN'
-                              ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                          }`}
-                        >
-                          {u.role || 'STUDENT'}
+                        <span className="text-[10px] bg-sky-500/10 border border-sky-500/30 text-sky-400 px-2 py-0.5 rounded font-bold uppercase">
+                          {b.status || 'BORROWED'}
                         </span>
                       </td>
                     </tr>
@@ -310,94 +248,158 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* TAB 3: ADD NEW BOOK FORM */}
-      {activeTab === 'addBook' && (
+      {/* TAB 2: ISSUE BOOK FORM */}
+      {activeTab === 'issue' && (
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-xl space-y-4">
           <div>
-            <h2 className="text-xl font-bold text-white">Add Book to Catalog</h2>
-            <p className="text-xs text-slate-400">Items added here will persist permanently in MongoDB Atlas</p>
+            <h2 className="text-xl font-bold text-white">Issue Book to Student</h2>
+            <p className="text-xs text-slate-400">Select student and book to create an official loan record</p>
           </div>
 
-          {message && (
-            <div
-              className={`p-3 rounded-xl text-xs font-semibold ${
-                message.startsWith('✅')
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                  : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
-              }`}
-            >
-              {message}
-            </div>
-          )}
+          {message && <div className="p-3 bg-slate-800 text-xs font-semibold rounded-xl">{message}</div>}
 
-          <form onSubmit={handleAddBook} className="space-y-4">
+          <form onSubmit={handleIssueBook} className="space-y-4">
             <div>
-              <label className="text-xs text-slate-400 font-semibold block mb-1">Book Title *</label>
-              <input
-                type="text"
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Select Student *</label>
+              <select
                 required
-                placeholder="e.g. Operating System Concepts"
-                value={newBook.title}
-                onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
-              />
+                value={issueForm.userId}
+                onChange={(e) => setIssueForm({ ...issueForm, userId: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+              >
+                <option value="">-- Choose Student --</option>
+                {users.map((u) => (
+                  <option key={u._id} value={u._id}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 font-semibold block mb-1">Author *</label>
-              <input
-                type="text"
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Select Book *</label>
+              <select
                 required
-                placeholder="e.g. Abraham Silberschatz"
-                value={newBook.author}
-                onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-slate-400 font-semibold block mb-1">Category</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Computer Science"
-                  value={newBook.category}
-                  onChange={(e) => setNewBook({ ...newBook, category: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-400 font-semibold block mb-1">Total Copies</label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={newBook.copies}
-                  onChange={(e) => setNewBook({ ...newBook, copies: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
-                />
-              </div>
+                value={issueForm.bookId}
+                onChange={(e) => setIssueForm({ ...issueForm, bookId: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+              >
+                <option value="">-- Choose Book --</option>
+                {books.map((b) => (
+                  <option key={b._id} value={b._id} disabled={(b.availableCopies ?? b.copies) <= 0}>
+                    {b.title} ({b.availableCopies ?? b.copies ?? 1} available)
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 font-semibold block mb-1">ISBN Code (Optional)</label>
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Loan Duration (Days)</label>
               <input
-                type="text"
-                placeholder="e.g. 978-1118063330"
-                value={newBook.isbn}
-                onChange={(e) => setNewBook({ ...newBook, isbn: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
+                type="number"
+                min="1"
+                required
+                value={issueForm.days}
+                onChange={(e) => setIssueForm({ ...issueForm, days: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
               />
             </div>
 
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-sky-600/20"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-600/20"
             >
-              {submitting ? 'Saving to Database...' : 'Save Book to Catalog'}
+              {submitting ? 'Issuing Book...' : 'Confirm Book Issue'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 3: MANAGE CATALOG */}
+      {activeTab === 'books' && (
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+          <h2 className="text-xl font-bold text-white">Library Catalog</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-300">
+              <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+                <tr>
+                  <th className="p-3">Title</th>
+                  <th className="p-3">Author</th>
+                  <th className="p-3">Category</th>
+                  <th className="p-3">Available Copies</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {books.map((b) => (
+                  <tr key={b._id} className="hover:bg-slate-800/40">
+                    <td className="p-3 font-semibold text-white">{b.title}</td>
+                    <td className="p-3">{b.author}</td>
+                    <td className="p-3"><span className="text-[10px] bg-slate-800 text-sky-400 p-1 rounded">{b.category}</span></td>
+                    <td className="p-3 font-bold text-emerald-400">{b.availableCopies ?? b.copies ?? 1}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: USERS LIST */}
+      {activeTab === 'users' && (
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+          <h2 className="text-xl font-bold text-white">Registered Users</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-300">
+              <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+                <tr>
+                  <th className="p-3">Name</th>
+                  <th className="p-3">Email</th>
+                  <th className="p-3">Role</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {users.map((u) => (
+                  <tr key={u._id} className="hover:bg-slate-800/40">
+                    <td className="p-3 font-semibold text-white">{u.name}</td>
+                    <td className="p-3">{u.email}</td>
+                    <td className="p-3"><span className="text-[10px] bg-emerald-500/10 text-emerald-400 p-1 rounded font-bold">{u.role || 'STUDENT'}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: ADD NEW BOOK */}
+      {activeTab === 'addBook' && (
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-xl space-y-4">
+          <h2 className="text-xl font-bold text-white">Add New Book to Catalog</h2>
+          {message && <div className="p-3 bg-slate-800 text-xs font-semibold rounded-xl">{message}</div>}
+          <form onSubmit={handleAddBook} className="space-y-4">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Book Title</label>
+              <input
+                type="text"
+                required
+                value={newBook.title}
+                onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Author</label>
+              <input
+                type="text"
+                required
+                value={newBook.author}
+                onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white"
+              />
+            </div>
+            <button type="submit" disabled={submitting} className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-xl text-sm">
+              {submitting ? 'Saving...' : 'Add Book'}
             </button>
           </form>
         </div>

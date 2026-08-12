@@ -2,40 +2,34 @@ const mongoose = require('mongoose');
 
 const borrowSchema = new mongoose.Schema(
   {
+    book: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User', // References the Book model (or 'Book' depending on model name)
+      ref: 'Book',
+      required: true,
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true
+      required: true,
     },
-    book: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Book',
-      required: true
-    },
-    issueDate: {
+    borrowDate: {
       type: Date,
-      default: Date.now
+      default: Date.now,
     },
     dueDate: {
       type: Date,
-      default: () => new Date(+new Date() + 14 * 24 * 60 * 60 * 1000)
+      required: true,
     },
     returnDate: {
-      type: Date
+      type: Date,
+      default: null,
     },
     status: {
       type: String,
-      enum: ['ISSUED', 'RETURNED', 'OVERDUE'],
-      default: 'ISSUED'
+      enum: ['BORROWED', 'RETURNED', 'OVERDUE'],
+      default: 'BORROWED',
     },
-    fineAmount: {
-      type: Number,
-      default: 0
-    },
-    isFinePaid: {
-      type: Boolean,
-      default: false
-    }
   },
   { timestamps: true }
 );
