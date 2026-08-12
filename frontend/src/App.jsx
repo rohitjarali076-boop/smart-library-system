@@ -1,32 +1,78 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Pages
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import MemberDashboard from './pages/MemberDashboard';
-import LibrarianDashboard from './pages/LibrarianDashboard';
-import AdminDashboard from './pages/AdminDashboard';
 import BookCatalog from './pages/BookCatalog';
+import AdminDashboard from './pages/AdminDashboard';
+import LibrarianDashboard from './pages/LibrarianDashboard';
+import StudentDashboard from './pages/StudentDashboard';
+import MemberDashboard from './pages/MemberDashboard';
 
-export default function App() {
+function App() {
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
+    <Router>
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
         <Navbar />
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/books" element={<BookCatalog />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          
-          <Route path="/dashboard" element={<MemberDashboard />} />
-          <Route path="/librarian/dashboard" element={<LibrarianDashboard />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <main className="flex-grow">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/books" element={<BookCatalog />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* Admin Route */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'LIBRARIAN']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Librarian Route */}
+            <Route
+              path="/librarian"
+              element={
+                <ProtectedRoute allowedRoles={['LIBRARIAN', 'ADMIN']}>
+                  <LibrarianDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Student Dashboard Route */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['STUDENT', 'MEMBER', 'ADMIN', 'LIBRARIAN']}>
+                  <StudentDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Member Dashboard Route */}
+            <Route
+              path="/member"
+              element={
+                <ProtectedRoute allowedRoles={['MEMBER', 'STUDENT', 'ADMIN', 'LIBRARIAN']}>
+                  <MemberDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Fallback Catch-All Route */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
       </div>
-    </BrowserRouter>
+    </Router>
   );
 }
+
+export default App;
