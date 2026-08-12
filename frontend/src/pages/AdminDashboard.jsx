@@ -16,8 +16,8 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('borrows'); // 'borrows' | 'issue' | 'books' | 'users' | 'addBook'
   const [loading, setLoading] = useState(true);
 
-  // Form states
-  const [issueForm, setIssueForm] = useState({ userId: '', bookId: '', days: 14 });
+  // Form states: Manual name input + Dropdown book selection
+  const [issueForm, setIssueForm] = useState({ studentName: '', bookId: '', days: 14 });
   const [newBook, setNewBook] = useState({ title: '', author: '', isbn: '', category: 'Computer Science', copies: 1 });
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -71,7 +71,7 @@ const AdminDashboard = () => {
       });
 
       setMessage(`✅ ${res.data.message || 'Book issued successfully!'}`);
-      setIssueForm({ userId: '', bookId: '', days: 14 });
+      setIssueForm({ studentName: '', bookId: '', days: 14 });
       fetchAdminData();
     } catch (err) {
       setMessage(`❌ Failed to issue book: ${err.response?.data?.message || 'Error occurred'}`);
@@ -163,7 +163,7 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <div className="flex border-b border-slate-800 space-x-4 overflow-x-auto">
         <button
           onClick={() => setActiveTab('borrows')}
@@ -219,7 +219,6 @@ const AdminDashboard = () => {
                 <thead className="bg-slate-800 text-xs uppercase text-slate-400">
                   <tr>
                     <th className="p-3">Student Name</th>
-                    <th className="p-3">Email</th>
                     <th className="p-3">Book Title</th>
                     <th className="p-3">Issued Date</th>
                     <th className="p-3">Due Date</th>
@@ -229,9 +228,8 @@ const AdminDashboard = () => {
                 <tbody className="divide-y divide-slate-800">
                   {borrows.map((b) => (
                     <tr key={b._id} className="hover:bg-slate-800/40 transition">
-                      <td className="p-3 font-semibold text-white">{b.user?.name || 'N/A'}</td>
-                      <td className="p-3 text-slate-400">{b.user?.email || 'N/A'}</td>
-                      <td className="p-3 text-sky-300 font-semibold">{b.book?.title || 'N/A'}</td>
+                      <td className="p-3 font-semibold text-white">{b.studentName || b.user?.name || 'N/A'}</td>
+                      <td className="p-3 text-sky-300 font-semibold">{b.book?.title || b.bookTitle || 'N/A'}</td>
                       <td className="p-3">{new Date(b.borrowDate || b.createdAt).toLocaleDateString()}</td>
                       <td className="p-3 text-amber-400">{new Date(b.dueDate).toLocaleDateString()}</td>
                       <td className="p-3">
@@ -248,46 +246,41 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* TAB 2: ISSUE BOOK FORM */}
+      {/* TAB 2: ISSUE BOOK FORM (TYPE NAME + SELECT SAVED BOOK) */}
       {activeTab === 'issue' && (
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-xl space-y-4">
           <div>
             <h2 className="text-xl font-bold text-white">Issue Book to Student</h2>
-            <p className="text-xs text-slate-400">Select student and book to create an official loan record</p>
+            <p className="text-xs text-slate-400">Type student name and select an existing book from the catalog</p>
           </div>
 
           {message && <div className="p-3 bg-slate-800 text-xs font-semibold rounded-xl">{message}</div>}
 
           <form onSubmit={handleIssueBook} className="space-y-4">
             <div>
-              <label className="text-xs text-slate-400 font-semibold block mb-1">Select Student *</label>
-              <select
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Student Name *</label>
+              <input
+                type="text"
                 required
-                value={issueForm.userId}
-                onChange={(e) => setIssueForm({ ...issueForm, userId: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
-              >
-                <option value="">-- Choose Student --</option>
-                {users.map((u) => (
-                  <option key={u._id} value={u._id}>
-                    {u.name} ({u.email})
-                  </option>
-                ))}
-              </select>
+                placeholder="Type student full name..."
+                value={issueForm.studentName}
+                onChange={(e) => setIssueForm({ ...issueForm, studentName: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
+              />
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 font-semibold block mb-1">Select Book *</label>
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Select Book from Catalog *</label>
               <select
                 required
                 value={issueForm.bookId}
                 onChange={(e) => setIssueForm({ ...issueForm, bookId: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
               >
-                <option value="">-- Choose Book --</option>
+                <option value="">-- Choose Book ({books.length} saved in library) --</option>
                 {books.map((b) => (
                   <option key={b._id} value={b._id} disabled={(b.availableCopies ?? b.copies) <= 0}>
-                    {b.title} ({b.availableCopies ?? b.copies ?? 1} available)
+                    {b.title} — By {b.author} ({(b.availableCopies ?? b.copies ?? 1)} copies left)
                   </option>
                 ))}
               </select>
@@ -301,7 +294,7 @@ const AdminDashboard = () => {
                 required
                 value={issueForm.days}
                 onChange={(e) => setIssueForm({ ...issueForm, days: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
               />
             </div>
 
