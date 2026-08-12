@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 
 export const AuthContext = createContext();
@@ -58,6 +58,15 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+// Custom Hook expected by Navbar.jsx
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    return { user: null, token: null, login: () => {}, logout: () => {} };
+  }
+  return context;
 };
 
 export default AuthContext;
