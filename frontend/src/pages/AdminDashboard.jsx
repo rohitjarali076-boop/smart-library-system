@@ -24,6 +24,7 @@ const AdminDashboard = () => {
     copies: 1,
   });
   const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchAdminData();
@@ -35,13 +36,15 @@ const AdminDashboard = () => {
     const config = { headers: { Authorization: `Bearer ${token}` } };
 
     try {
-      const [booksRes, usersRes] = await Promise.all([
+      const [booksRes, usersRes, borrowsRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/api/v1/books`, config).catch(() => ({ data: [] })),
         axios.get(`${API_BASE_URL}/api/v1/users`, config).catch(() => ({ data: [] })),
+        axios.get(`${API_BASE_URL}/api/v1/borrow/all`, config).catch(() => ({ data: [] })),
       ]);
 
       const bookList = booksRes.data.data || booksRes.data || [];
       const userList = usersRes.data.data || usersRes.data || [];
+      const borrowList = borrowsRes.data.data || borrowsRes.data || [];
 
       setBooks(bookList);
       setUsers(userList);
@@ -49,8 +52,8 @@ const AdminDashboard = () => {
       setStats({
         totalBooks: bookList.length,
         totalMembers: userList.length,
-        activeBorrows: 0, // Updated dynamically when borrow endpoints respond
-        overdueBorrows: 0,
+        activeBorrows: borrowList.filter((b) => b.status === 'BORROWED' || !b.returnedAt).length,
+        overdueBorrows: borrowList.filter((b) => b.status === 'OVERDUE').length,
       });
     } catch (err) {
       console.error('Error loading admin dashboard data:', err);
@@ -62,22 +65,44 @@ const AdminDashboard = () => {
   const handleAddBook = async (e) => {
     e.preventDefault();
     setMessage('');
+    setSubmitting(true);
     const token = localStorage.getItem('token');
 
     try {
-      await axios.post(`${API_BASE_URL}/api/v1/books`, newBook, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setMessage('✅ Book added successfully!');
-      setNewBook({ title: '', author: '', isbn: '', category: 'Computer Science', copies: 1 });
-      fetchAdminData();
+      const res = await axios.post(
+        `${API_BASE_URL}/api/v1/books`,
+        {
+          title: newBook.title,
+          author: newBook.author,
+          isbn: newBook.isbn || `ISBN-${Date.now()}`,
+          category: newBook.category,
+          copies: Number(newBook.copies) || 1,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (res.status === 200 || res.status === 201) {
+        setMessage('✅ Book saved permanently to MongoDB database!');
+        setNewBook({
+          title: '',
+          author: '',
+          isbn: '',
+          category: 'Computer Science',
+          copies: 1,
+        });
+        fetchAdminData();
+      }
     } catch (err) {
-      setMessage(`❌ Failed to add book: ${err.response?.data?.message || 'Error occurred'}`);
+      setMessage(`❌ Failed to save book: ${err.response?.data?.message || 'Server error occurred'}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDeleteBook = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this book?')) return;
+    if (!window.confirm('Are you sure you want to permanently delete this book from the catalog?')) return;
     const token = localStorage.getItem('token');
 
     try {
@@ -86,7 +111,7 @@ const AdminDashboard = () => {
       });
       fetchAdminData();
     } catch (err) {
-      alert('Failed to delete book');
+      alert(`Failed to delete book: ${err.response?.data?.message || 'Error occurred'}`);
     }
   };
 
@@ -106,7 +131,10 @@ const AdminDashboard = () => {
           </p>
         </div>
         <button
-          onClick={() => setActiveTab('addBook')}
+          onClick={() => {
+            setMessage('');
+            setActiveTab('addBook');
+          }}
           className="bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition shadow-lg shadow-sky-600/20 flex items-center space-x-2"
         >
           <span>➕</span>
@@ -114,7 +142,7 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-      {/* Admin Quick Metrics */}
+      {/* Quick Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
           <div>
@@ -142,8 +170,8 @@ const AdminDashboard = () => {
 
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex justify-between items-center">
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">System Alerts</p>
-            <p className="text-3xl font-black text-amber-400 mt-2">0</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Overdue Alerts</p>
+            <p className="text-3xl font-black text-amber-400 mt-2">{stats.overdueBorrows}</p>
           </div>
           <div className="p-3 bg-slate-800 rounded-xl text-xl">🔔</div>
         </div>
@@ -172,7 +200,10 @@ const AdminDashboard = () => {
           👥 Registered Users ({users.length})
         </button>
         <button
-          onClick={() => setActiveTab('addBook')}
+          onClick={() => {
+            setMessage('');
+            setActiveTab('addBook');
+          }}
           className={`pb-3 px-2 font-semibold text-sm transition border-b-2 ${
             activeTab === 'addBook'
               ? 'border-sky-500 text-sky-400'
@@ -188,9 +219,9 @@ const AdminDashboard = () => {
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
           <h2 className="text-xl font-bold text-white">Library Catalog Management</h2>
           {loading ? (
-            <p className="text-slate-400 text-sm">Loading books...</p>
+            <p className="text-slate-400 text-sm">Loading book catalog from database...</p>
           ) : books.length === 0 ? (
-            <p className="text-slate-400 text-sm">No books registered in system.</p>
+            <p className="text-slate-400 text-sm">No books registered in system database.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-300">
@@ -199,25 +230,30 @@ const AdminDashboard = () => {
                     <th className="p-3">Title</th>
                     <th className="p-3">Author</th>
                     <th className="p-3">Category</th>
-                    <th className="p-3">Copies</th>
+                    <th className="p-3">Copies Available</th>
                     <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {books.map((book) => (
-                    <tr key={book._id} className="hover:bg-slate-800/40">
+                    <tr key={book._id} className="hover:bg-slate-800/40 transition">
                       <td className="p-3 font-semibold text-white">{book.title}</td>
                       <td className="p-3">{book.author}</td>
                       <td className="p-3">
-                        <span className="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-sky-400">
+                        <span className="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-sky-400 font-semibold">
                           {book.category || 'General'}
                         </span>
                       </td>
-                      <td className="p-3">{book.copies || 1}</td>
+                      <td className="p-3">
+                        <span className="font-bold text-emerald-400">
+                          {book.availableCopies ?? book.copies ?? 1}
+                        </span>{' '}
+                        / {book.copies || 1}
+                      </td>
                       <td className="p-3 text-right">
                         <button
                           onClick={() => handleDeleteBook(book._id)}
-                          className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1 rounded-lg text-xs font-semibold transition"
+                          className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition"
                         >
                           Delete
                         </button>
@@ -236,7 +272,7 @@ const AdminDashboard = () => {
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
           <h2 className="text-xl font-bold text-white">Registered System Users</h2>
           {users.length === 0 ? (
-            <p className="text-slate-400 text-sm">No users fetched or database restricted.</p>
+            <p className="text-slate-400 text-sm">No user records fetched from database.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-300">
@@ -250,13 +286,13 @@ const AdminDashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {users.map((u) => (
-                    <tr key={u._id} className="hover:bg-slate-800/40">
+                    <tr key={u._id} className="hover:bg-slate-800/40 transition">
                       <td className="p-3 font-semibold text-white">{u.name}</td>
                       <td className="p-3">{u.email}</td>
                       <td className="p-3">{u.department || 'N/A'}</td>
                       <td className="p-3">
                         <span
-                          className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
+                          className={`text-[10px] px-2.5 py-1 rounded font-bold uppercase border ${
                             u.role?.toUpperCase() === 'ADMIN'
                               ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
                               : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
@@ -277,62 +313,91 @@ const AdminDashboard = () => {
       {/* TAB 3: ADD NEW BOOK FORM */}
       {activeTab === 'addBook' && (
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-xl space-y-4">
-          <h2 className="text-xl font-bold text-white">Add Book to Catalog</h2>
-          {message && <div className="p-3 bg-slate-800 rounded-lg text-xs font-semibold">{message}</div>}
+          <div>
+            <h2 className="text-xl font-bold text-white">Add Book to Catalog</h2>
+            <p className="text-xs text-slate-400">Items added here will persist permanently in MongoDB Atlas</p>
+          </div>
+
+          {message && (
+            <div
+              className={`p-3 rounded-xl text-xs font-semibold ${
+                message.startsWith('✅')
+                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                  : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+              }`}
+            >
+              {message}
+            </div>
+          )}
 
           <form onSubmit={handleAddBook} className="space-y-4">
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Book Title</label>
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Book Title *</label>
               <input
                 type="text"
                 required
+                placeholder="e.g. Operating System Concepts"
                 value={newBook.title}
                 onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
               />
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Author</label>
+              <label className="text-xs text-slate-400 font-semibold block mb-1">Author *</label>
               <input
                 type="text"
                 required
+                placeholder="e.g. Abraham Silberschatz"
                 value={newBook.author}
                 onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Category</label>
+                <label className="text-xs text-slate-400 font-semibold block mb-1">Category</label>
                 <input
                   type="text"
                   required
+                  placeholder="e.g. Computer Science"
                   value={newBook.category}
                   onChange={(e) => setNewBook({ ...newBook, category: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Total Copies</label>
+                <label className="text-xs text-slate-400 font-semibold block mb-1">Total Copies</label>
                 <input
                   type="number"
                   min="1"
                   required
                   value={newBook.copies}
                   onChange={(e) => setNewBook({ ...newBook, copies: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
                 />
               </div>
             </div>
 
+            <div>
+              <label className="text-xs text-slate-400 font-semibold block mb-1">ISBN Code (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. 978-1118063330"
+                value={newBook.isbn}
+                onChange={(e) => setNewBook({ ...newBook, isbn: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition"
+              />
+            </div>
+
             <button
               type="submit"
-              className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-sky-600/20"
+              disabled={submitting}
+              className="w-full bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-sky-600/20"
             >
-              Add Book to System
+              {submitting ? 'Saving to Database...' : 'Save Book to Catalog'}
             </button>
           </form>
         </div>
