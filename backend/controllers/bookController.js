@@ -1,105 +1,156 @@
 const Book = require('../models/Book');
 
+// @desc    Get all books from catalog
+// @route   GET /api/v1/books
+// @access  Public / Member
 exports.getBooks = async (req, res) => {
   try {
     const books = await Book.find().sort({ createdAt: -1 });
-    res.status(200).json({ success: true, count: books.length, data: books });
+
+    return res.status(200).json({
+      success: true,
+      count: books.length,
+      data: books,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error fetching books:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching catalog',
+      error: error.message,
+    });
   }
 };
 
+// @desc    Get single book by ID
+// @route   GET /api/v1/books/:id
+// @access  Public / Member
 exports.getBookById = async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
+
     if (!book) {
-      return res.status(404).json({ success: false, message: 'Book not found' });
-    }
-    res.status(200).json({ success: true, data: book });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-exports.createBook = async (req, res) => {
-  try {
-    const { title, author, isbn, category, totalCopies, shelfNumber, coverImage, description } = req.body;
-
-    if (!title || !author || !isbn) {
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
-        message: 'Please provide required fields: Title, Author, and ISBN'
+        message: 'Book not found',
       });
     }
 
-    const existingBook = await Book.findOne({ isbn: isbn.trim() });
-    if (existingBook) {
-      return res.status(400).json({
-        success: false,
-        message: `A book with ISBN '${isbn}' already exists in catalog`
-      });
-    }
-
-    const copies = Number(totalCopies) > 0 ? Number(totalCopies) : 1;
-
-    const book = await Book.create({
-      title: title.trim(),
-      author: author.trim(),
-      isbn: isbn.trim(),
-      category: category ? category.trim() : 'Computer Science',
-      totalCopies: copies,
-      availableCopies: copies,
-      shelfNumber: shelfNumber ? shelfNumber.trim() : 'CS-101',
-      coverImage: coverImage ? coverImage.trim() : 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=300',
-      description: description ? description.trim() : ''
-    });
-
-    res.status(201).json({
+    return res.status(200).json({
       success: true,
-      message: 'Book added to catalog successfully!',
-      data: book
+      data: book,
     });
   } catch (error) {
-    console.error('Create Book Error:', error);
-    res.status(500).json({
+    console.error('Error fetching book by ID:', error);
+    return res.status(500).json({
       success: false,
-      message: error.message || 'Internal Server Error while adding book'
+      message: 'Server error while fetching book details',
+      error: error.message,
     });
   }
 };
 
+// @desc    Add new book permanently to database
+// @route   POST /api/v1/books
+// @access  Private (Admin / Librarian)
+exports.addBook = async (req, res) => {
+  try {
+    const { title, author, isbn, category, copies } = req.body;
+
+    if (!title || !author) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title and Author are required fields.',
+      });
+    }
+
+    const numCopies = Number(copies) || 1;
+
+    // Create and save new book document directly to MongoDB Atlas
+    const newBook = await Book.create({
+      title,
+      author,
+      isbn: isbn || `ISBN-${Date.now()}`,
+      category: category || 'General',
+      copies: numCopies,
+      availableCopies: numCopies,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Book successfully added and saved permanently to catalog.',
+      data: newBook,
+    });
+  } catch (error) {
+    console.error('Error adding book:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to save book to database',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update book details
+// @route   PUT /api/v1/books/:id
+// @access  Private (Admin / Librarian)
 exports.updateBook = async (req, res) => {
   try {
-    const { title, author, isbn, category, totalCopies, shelfNumber, coverImage, description } = req.body;
-
     let book = await Book.findById(req.params.id);
+
     if (!book) {
-      return res.status(404).json({ success: false, message: 'Book not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Book not found',
+      });
     }
 
-    if (totalCopies !== undefined) {
-      const diff = Number(totalCopies) - book.totalCopies;
-      book.totalCopies = Number(totalCopies);
-      book.availableCopies = Math.max(0, book.availableCopies + diff);
-    }
+    book = await Book.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
 
-    book.title = title || book.title;
-    book.author = author || book.author;
-    book.isbn = isbn || book.isbn;
-    book.category = category || book.category;
-    book.shelfNumber = shelfNumber || book.shelfNumber;
-    book.coverImage = coverImage || book.coverImage;
-    book.description = description !== undefined ? description : book.description;
-
-    await book.save();
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: 'Book details updated successfully!',
-      data: book
+      message: 'Book updated successfully',
+      data: book,
     });
   } catch (error) {
-    console.error('Update Book Error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error updating book:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update book details',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Delete book from catalog
+// @route   DELETE /api/v1/books/:id
+// @access  Private (Admin / Librarian)
+exports.deleteBook = async (req, res) => {
+  try {
+    const book = await Book.findById(req.params.id);
+
+    if (!book) {
+      return res.status(404).json({
+        success: false,
+        message: 'Book not found',
+      });
+    }
+
+    await book.deleteOne();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Book removed permanently from catalog',
+    });
+  } catch (error) {
+    console.error('Error deleting book:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete book from database',
+      error: error.message,
+    });
   }
 };
