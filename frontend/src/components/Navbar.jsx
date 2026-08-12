@@ -1,97 +1,108 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { BookOpen, LogOut, User, LayoutDashboard } from 'lucide-react';
 
-export default function Navbar() {
+const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const getDashboardRoute = () => {
-    if (!user) return '/login';
-    if (user.role === 'ADMIN') return '/admin/dashboard';
-    if (user.role === 'LIBRARIAN') return '/librarian/dashboard';
-    return '/dashboard';
-  };
+  // Safe check for active path using optional chaining
+  const currentPath = location?.pathname || '';
+  const isActive = (path) => currentPath.startsWith(path);
+
+  const userRole = user?.role?.toUpperCase();
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="p-2 bg-sky-600 rounded-lg text-white">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <span className="font-bold text-lg text-slate-900 dark:text-white tracking-tight">
-              SmartLib
-            </span>
+    <nav className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 px-6 py-3">
+      <div className="max-w-7xl mx-auto flex justify-between items-center">
+        {/* Brand Logo */}
+        <Link to="/" className="flex items-center space-x-2">
+          <div className="bg-sky-600 p-2 rounded-xl text-white font-bold text-lg">
+            📖
+          </div>
+          <span className="text-lg font-bold text-white tracking-wide">
+            SmartLib
+          </span>
+        </Link>
+
+        {/* Navigation Links */}
+        <div className="flex items-center space-x-6 text-sm font-medium">
+          <Link
+            to="/"
+            className={`transition ${
+              isActive('/') && currentPath === '/'
+                ? 'text-sky-400 font-semibold'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Home
           </Link>
 
-          {/* Nav Links */}
-          <div className="flex items-center gap-4">
-            <Link 
-              to="/" 
-              className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+          <Link
+            to="/books"
+            className={`transition ${
+              isActive('/books')
+                ? 'text-sky-400 font-semibold'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Catalog
+          </Link>
+
+          {user && (
+            <Link
+              to={userRole === 'ADMIN' || userRole === 'LIBRARIAN' ? '/admin' : '/dashboard'}
+              className={`transition ${
+                isActive('/admin') || isActive('/dashboard')
+                  ? 'text-sky-400 font-semibold'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              Home
+              Dashboard
             </Link>
+          )}
+        </div>
 
-            {user ? (
-              <div className="flex items-center gap-3">
-                <Link
-                  to={getDashboardRoute()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-sky-700 bg-sky-50 dark:bg-sky-950/60 dark:text-sky-300 rounded-lg hover:bg-sky-100 dark:hover:bg-sky-900 transition-colors"
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
-                </Link>
-
-                <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-700">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-none">
-                      {user.name}
-                    </p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">
-                      {user.role.toLowerCase()}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleLogout}
-                    title="Logout"
-                    className="p-2 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link
-                  to="/login"
-                  className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-sky-600 transition-colors"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/register"
-                  className="px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors shadow-sm"
-                >
-                  Register
-                </Link>
-              </div>
-            )}
-          </div>
-
+        {/* User Auth Status */}
+        <div className="flex items-center space-x-3">
+          {user ? (
+            <div className="flex items-center space-x-3">
+              <span className="text-xs text-slate-300 font-medium hidden sm:inline">
+                {user.name || user.email}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs px-3 py-2 rounded-xl transition font-semibold"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <Link
+                to="/login"
+                className="text-slate-300 hover:text-white text-xs px-3 py-2 rounded-xl transition font-semibold"
+              >
+                Login
+              </Link>
+              <Link
+                to="/register"
+                className="bg-sky-600 hover:bg-sky-500 text-white text-xs px-4 py-2 rounded-xl transition font-bold shadow-md shadow-sky-600/20"
+              >
+                Register
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </nav>
   );
-}
+};
+
+export default Navbar;
