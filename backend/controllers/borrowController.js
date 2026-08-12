@@ -2,7 +2,7 @@ const Borrow = require('../models/Borrow');
 const Book = require('../models/Book');
 const User = require('../models/User');
 
-// @desc    Issue book to a student (Manual Name or Registered User)
+// @desc    Issue book to a student (Manual Name or Registered Member)
 // @route   POST /api/v1/borrow/issue
 // @access  Private (Admin / Librarian)
 exports.issueBook = async (req, res) => {
@@ -12,22 +12,27 @@ exports.issueBook = async (req, res) => {
     if (!studentName || !bookId) {
       return res.status(400).json({
         success: false,
-        message: 'Student Name and Book selection are required.',
+        message: 'Student name and book selection are required.',
       });
     }
 
     const query = studentName.trim();
 
-    // Look for matching registered user if available
-    const student = await User.findOne({
-      $or: [
-        { name: { $regex: `^${query}$`, $options: 'i' } },
-        { memberId: query },
-        { email: query },
-      ],
-    });
+    // Check if user exists in database
+    let student = null;
+    try {
+      student = await User.findOne({
+        $or: [
+          { name: { $regex: `^${query}$`, $options: 'i' } },
+          { memberId: query },
+          { email: query },
+        ],
+      });
+    } catch (err) {
+      console.log('User query skipped:', err.message);
+    }
 
-    // Check book availability
+    // Find Book
     const book = await Book.findById(bookId);
     if (!book) {
       return res.status(404).json({ success: false, message: 'Book not found' });
@@ -41,11 +46,11 @@ exports.issueBook = async (req, res) => {
       });
     }
 
-    // Calculate Due Date
+    // Due Date Calculation
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + Number(days));
 
-    // Save borrow record permanently
+    // Save Borrow Record
     const borrowRecord = await Borrow.create({
       user: student ? student._id : null,
       studentName: student ? student.name : query,
@@ -55,7 +60,7 @@ exports.issueBook = async (req, res) => {
       status: 'BORROWED',
     });
 
-    // Reduce available copies in database
+    // Deduct available copies
     book.availableCopies = Math.max(0, currentCopies - 1);
     await book.save();
 
@@ -68,7 +73,30 @@ exports.issueBook = async (req, res) => {
     console.error('Error issuing book:', error);
     return res.status(500).json({
       success: false,
-      message: error.message || 'Server error while issuing book',
+      message: error.message || 'Server error occurred while issuing book',
+    });
+  }
+};
+
+// @desc    Get all borrow records
+// @route   GET /api/v1/borrow/all
+// @access  Private (Admin / Librarian)
+exports.getAllBorrows = async (req, res) => {
+  try {
+    const records = await Borrow.find()
+      .populate('user', 'name email memberId')
+      .populate('book', 'title author category')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: records.length,
+      data: records,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };

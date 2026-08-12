@@ -5,7 +5,7 @@ const borrowSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: false, // Made optional so unregistered student names work
+      required: false,
     },
     studentName: {
       type: String,
