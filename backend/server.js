@@ -1,50 +1,32 @@
-const dns = require('dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
-
 const express = require('express');
-const dotenv = require('dotenv');
 const cors = require('cors');
+const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 
+// Load environment variables
 dotenv.config();
+
+// Connect to MongoDB
 connectDB();
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// At the bottom of backend/server.js
-const PORT = process.env.PORT || 5000;
-
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server listening on port ${PORT}`);
-  });
-}
-
-module.exports = app;
-
-// Main API v1 Routes
+// API Routes
 app.use('/api/v1/auth', require('./routes/authRoutes'));
 app.use('/api/v1/books', require('./routes/bookRoutes'));
-app.use('/api/v1/admin', require('./routes/adminRoutes'));
-app.use('/api/v1/borrows', require('./routes/borrowRoutes'));
-app.use('/api/v1/student', require('./routes/studentRoutes'));
+app.use('/api/v1/borrow', require('./routes/borrowRoutes'));
+app.use('/api/v1/users', require('./routes/userRoutes'));
 
-// Fallbacks
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/books', require('./routes/bookRoutes'));
-app.use('/api/admin', require('./routes/adminRoutes'));
-app.use('/api/borrows', require('./routes/borrowRoutes'));
-app.use('/api/student', require('./routes/studentRoutes'));
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'Library System API Online' });
+// Root endpoint test
+app.get('/', (req, res) => {
+  res.send('Smart Library System API is running...');
 });
 
-// Remove any duplicate "const PORT" lines above this
-
+// Port configuration (Single declaration)
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
