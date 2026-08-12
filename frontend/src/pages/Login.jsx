@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { AuthContext } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://smart-library-system-9i87.onrender.com';
 
@@ -11,54 +12,54 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+  const authContext = useContext(AuthContext);
 
-  const performLogin = async (loginEmail, loginPassword) => {
+  const handleLogin = async (e) => {
+    e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
       const res = await axios.post(`${API_BASE_URL}/api/v1/auth/login`, {
-        email: loginEmail,
-        password: loginPassword
+        email,
+        password,
       });
 
-      const user = res.data.user;
-      const token = res.data.token;
+      const userData = res.data.user || res.data.data;
+      const userToken = res.data.token;
 
-      // Save user session
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      if (authContext?.login) {
+        authContext.login(userData, userToken);
+      } else {
+        localStorage.setItem('token', userToken);
+        localStorage.setItem('user', JSON.stringify(userData));
+      }
 
-      // Case-insensitive role evaluation
-      const role = user?.role?.toUpperCase();
+      const userRole = userData?.role?.toUpperCase();
 
-      if (role === 'ADMIN' || role === 'LIBRARIAN') {
+      if (userRole === 'ADMIN' || userRole === 'LIBRARIAN') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+      setError(err.response?.data?.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    performLogin(email, password);
-  };
-
-  const handleAdminDemo = () => {
+  // Fills demo credentials without auto-submitting
+  const fillAdminDemo = () => {
     setEmail('admin@smartlib.edu');
     setPassword('AdminPassword123');
-    performLogin('admin@smartlib.edu', 'AdminPassword123');
+    setError('');
   };
 
-  const handleStudentDemo = () => {
+  const fillStudentDemo = () => {
     setEmail('alex@smartlib.edu');
     setPassword('StudentPassword123');
-    performLogin('alex@smartlib.edu', 'StudentPassword123');
+    setError('');
   };
 
   return (
@@ -69,29 +70,29 @@ const Login = () => {
           <p className="text-xs text-slate-400">Access your library dashboard and catalog</p>
         </div>
 
-        {/* Instant Demo Login Buttons */}
+        {/* Demo Credential Fillers */}
         <div className="bg-slate-800/60 border border-slate-700/60 p-3 rounded-xl space-y-2">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">
-            ⚡ Instant Demo Login
+            ⚡ Fill Demo Credentials
           </p>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={handleAdminDemo}
+              onClick={fillAdminDemo}
               disabled={loading}
               className="bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs py-2 px-3 rounded-lg font-semibold transition flex items-center justify-center space-x-1 disabled:opacity-50"
             >
               <span>🛡️</span>
-              <span>Admin Dashboard</span>
+              <span>Admin Demo</span>
             </button>
             <button
               type="button"
-              onClick={handleStudentDemo}
+              onClick={fillStudentDemo}
               disabled={loading}
               className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs py-2 px-3 rounded-lg font-semibold transition flex items-center justify-center space-x-1 disabled:opacity-50"
             >
               <span>🎓</span>
-              <span>Student Dashboard</span>
+              <span>Student Demo</span>
             </button>
           </div>
         </div>
