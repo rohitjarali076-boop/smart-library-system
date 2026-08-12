@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
-// Dynamically uses environment variable or defaults to live Render backend URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://smart-library-system-9i87.onrender.com';
 
 const Login = () => {
@@ -23,16 +22,23 @@ const Login = () => {
         password: loginPassword
       });
 
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+      const user = res.data.user;
+      const token = res.data.token;
 
-      if (res.data.user?.role === 'ADMIN' || res.data.user?.role === 'LIBRARIAN') {
+      // Save user session
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+
+      // Case-insensitive role evaluation
+      const role = user?.role?.toUpperCase();
+
+      if (role === 'ADMIN' || role === 'LIBRARIAN') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password. If this is a new database, please register first.');
+      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -43,7 +49,6 @@ const Login = () => {
     performLogin(email, password);
   };
 
-  // Instant Demo Login Handlers
   const handleAdminDemo = () => {
     setEmail('admin@smartlib.edu');
     setPassword('AdminPassword123');
@@ -64,7 +69,7 @@ const Login = () => {
           <p className="text-xs text-slate-400">Access your library dashboard and catalog</p>
         </div>
 
-        {/* Demo Login Buttons */}
+        {/* Instant Demo Login Buttons */}
         <div className="bg-slate-800/60 border border-slate-700/60 p-3 rounded-xl space-y-2">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">
             ⚡ Instant Demo Login
