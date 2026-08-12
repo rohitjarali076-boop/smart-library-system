@@ -19,7 +19,6 @@ app.use(express.json());
 app.use('/api/v1/auth', require('./routes/authRoutes'));
 app.use('/api/v1/books', require('./routes/bookRoutes'));
 app.use('/api/v1/borrow', require('./routes/borrowRoutes'));
-app.use('/api/v1/users', require('./routes/userRoutes'));
 
 // Root endpoint test
 app.get('/', (req, res) => {
