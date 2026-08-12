@@ -49,52 +49,12 @@ const Login = () => {
     }
   };
 
-  // Fills demo credentials without auto-submitting
-  const fillAdminDemo = () => {
-    setEmail('admin@smartlib.edu');
-    setPassword('AdminPassword123');
-    setError('');
-  };
-
-  const fillStudentDemo = () => {
-    setEmail('alex@smartlib.edu');
-    setPassword('StudentPassword123');
-    setError('');
-  };
-
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-6 bg-slate-950 text-slate-100">
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl space-y-6">
         <div className="text-center space-y-1">
           <h2 className="text-2xl font-bold text-white">Sign In to Account</h2>
           <p className="text-xs text-slate-400">Access your library dashboard and catalog</p>
-        </div>
-
-        {/* Demo Credential Fillers */}
-        <div className="bg-slate-800/60 border border-slate-700/60 p-3 rounded-xl space-y-2">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">
-            ⚡ Fill Demo Credentials
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={fillAdminDemo}
-              disabled={loading}
-              className="bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs py-2 px-3 rounded-lg font-semibold transition flex items-center justify-center space-x-1 disabled:opacity-50"
-            >
-              <span>🛡️</span>
-              <span>Admin Demo</span>
-            </button>
-            <button
-              type="button"
-              onClick={fillStudentDemo}
-              disabled={loading}
-              className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs py-2 px-3 rounded-lg font-semibold transition flex items-center justify-center space-x-1 disabled:opacity-50"
-            >
-              <span>🎓</span>
-              <span>Student Demo</span>
-            </button>
-          </div>
         </div>
 
         {error && (
