@@ -6,7 +6,7 @@ const connectDB = require('./config/db');
 // Load environment variables
 dotenv.config();
 
-// Connect to MongoDB
+// Connect to MongoDB Database
 connectDB();
 
 const app = express();
@@ -20,18 +20,16 @@ app.use('/api/v1/auth', require('./routes/authRoutes'));
 app.use('/api/v1/books', require('./routes/bookRoutes'));
 app.use('/api/v1/borrow', require('./routes/borrowRoutes'));
 
-// Root endpoint test
+// Health check / Root endpoint
 app.get('/', (req, res) => {
-  res.send('Smart Library System API is running...');
+  res.send('Smart Library System API is active and running');
 });
 
-// Port configuration (Single declaration)
+// Port configuration & Server Binding for Render deployment
 const PORT = process.env.PORT || 5000;
 
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
-}
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
 
 module.exports = app;
