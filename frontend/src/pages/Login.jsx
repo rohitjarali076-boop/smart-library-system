@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
+// Dynamically uses environment variable or defaults to live Render backend URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://smart-library-system-9i87.onrender.com';
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,7 +18,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:5000/api/v1/auth/login', {
+      const res = await axios.post(`${API_BASE_URL}/api/v1/auth/login`, {
         email: loginEmail,
         password: loginPassword
       });
@@ -23,13 +26,13 @@ const Login = () => {
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
 
-      if (res.data.user.role === 'ADMIN' || res.data.user.role === 'LIBRARIAN') {
+      if (res.data.user?.role === 'ADMIN' || res.data.user?.role === 'LIBRARIAN') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      setError(err.response?.data?.message || 'Invalid email or password. If this is a new database, please register first.');
     } finally {
       setLoading(false);
     }
@@ -40,7 +43,7 @@ const Login = () => {
     performLogin(email, password);
   };
 
-  // Instant One-Click Demo Direct Logins
+  // Instant Demo Login Handlers
   const handleAdminDemo = () => {
     setEmail('admin@smartlib.edu');
     setPassword('AdminPassword123');
@@ -61,7 +64,7 @@ const Login = () => {
           <p className="text-xs text-slate-400">Access your library dashboard and catalog</p>
         </div>
 
-        {/* One-Click Direct Demo Logins */}
+        {/* Demo Login Buttons */}
         <div className="bg-slate-800/60 border border-slate-700/60 p-3 rounded-xl space-y-2">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">
             ⚡ Instant Demo Login
@@ -71,7 +74,7 @@ const Login = () => {
               type="button"
               onClick={handleAdminDemo}
               disabled={loading}
-              className="bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs py-2 px-3 rounded-lg font-semibold transition flex items-center justify-center space-x-1"
+              className="bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs py-2 px-3 rounded-lg font-semibold transition flex items-center justify-center space-x-1 disabled:opacity-50"
             >
               <span>🛡️</span>
               <span>Admin Dashboard</span>
@@ -80,7 +83,7 @@ const Login = () => {
               type="button"
               onClick={handleStudentDemo}
               disabled={loading}
-              className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs py-2 px-3 rounded-lg font-semibold transition flex items-center justify-center space-x-1"
+              className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs py-2 px-3 rounded-lg font-semibold transition flex items-center justify-center space-x-1 disabled:opacity-50"
             >
               <span>🎓</span>
               <span>Student Dashboard</span>
@@ -89,7 +92,7 @@ const Login = () => {
         </div>
 
         {error && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold rounded-lg text-center">
+          <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold rounded-lg text-center leading-relaxed">
             {error}
           </div>
         )}
